@@ -23,7 +23,7 @@ fork {
 
 	~launchOtherPrograms = {
 		~unity_progam = ~unity_progam ?? {unixCmd(~hpwd +/+ "/jellyfish_unity_builds/buildK.x86_64")};
-		~mediapipe = ~mediapipe ?? {unixCmd(~camwd +/+ "/venv/bin/python" + ~camwd +/+ "/main.py -d")};
+		~mediapipe = ~mediapipe ?? {unixCmd(~camwd +/+ "/venv/bin/python" + ~camwd +/+ "/main.py")};
 	};
 
 	~killOtherPrograms = {
@@ -54,13 +54,31 @@ s.options.numInputBusChannels = 2;
 s.options.numWireBufs = 1024;
 s.options.numOutputBusChannels = 2 + 1 + ~outChans;
 
-"SC_JACK_DEFAULT_INPUTS".setenv("system:capture_3,system:capture_4");
-"SC_JACK_DEFAULT_OUTPUTS".setenv("system:playback_1,system:playback_2");
+//"SC_JACK_DEFAULT_INPUTS".setenv("system:capture_3,system:capture_4");
+//"SC_JACK_DEFAULT_OUTPUTS".setenv("system:playback_1,system:playback_2");
 
 ///////////////////////////////////
 // * subtargets
 
 ~subtargets = JHSubTargets()
+.add(\jack_connect, func: {
+	[
+		"jack_connect system:capture_3 SuperCollider:in_1",
+		"jack_connect system:capture_4 SuperCollider:in_2",
+		"jack_connect system:capture_3 REAPER:in1",
+		"jack_connect system:capture_4 REAPER:in2",
+		"jack_connect SuperCollider:out_1 REAPER:in3",
+		"jack_connect SuperCollider:out_2 REAPER:in4",
+		"jack_connect SuperCollider:out_3 REAPER:in5",
+		"jack_connect SuperCollider:out_4 REAPER:in6",
+		"jack_connect SuperCollider:out_5 REAPER:in7",
+		"jack_connect SuperCollider:out_6 REAPER:in8",
+		"jack_connect SuperCollider:out_7 REAPER:in9",
+
+		"jack_connect SuperCollider:out_1 system:playback_1",
+		"jack_connect SuperCollider:out_2 system:playback_2"
+	].do(_.unixCmd);
+})
 .add(\buildDataSets, func: {
 	~waterDataSet = JHImport(~pwd +/+ "datasets/water.scd").(
 		cachePath: ~pwd +/+ "audio/cache/waterDrops",
@@ -156,23 +174,22 @@ s.options.numOutputBusChannels = 2 + 1 + ~outChans;
 	// silence - fade in
 	(~pwd +/+ "maps/00.scd").load;
 
-	// // section A
+	// section A
 	(~pwd +/+ "maps/01.scd").load;
 	(~pwd +/+ "maps/02.scd").load;
 	(~pwd +/+ "maps/03.scd").load;
 	//
-	// // transition --  something here isn't working as expected.
 	(~pwd +/+ "maps/04.scd").load;
 
 	// section B
 	(~pwd +/+ "maps/05.scd").load;
 
-	// 6 is where the strands seperate and there's a lost of cohension
 	(~pwd +/+ "maps/06.scd").load;
 
-	// section C
-	(~pwd +/+ "maps/07.scd").load;
+	//(~pwd +/+ "maps/07.scd").load;
 	(~pwd +/+ "maps/08.scd").load;
+	(~pwd +/+ "maps/09.scd").load;
+	(~pwd +/+ "maps/10.scd").load;
 })
 
 .add(\defineMainOSCMap, [\defineMainMap, \defineOSCRelaySynth], {
@@ -201,7 +218,7 @@ s.options.numOutputBusChannels = 2 + 1 + ~outChans;
 // * target launcher
 
 JHLauncher(~subtargets)
-.addTarget('Full Piece', [\defineMainOSCMap, \loadPreviousState])
+.addTarget('Full Piece', [\defineMainOSCMap, \loadPreviousState, \jack_connect])
 //.addTarget('Full Piece - No Load', [\defineMainOSCMap])
 .addTarget('Only External OSC', [\defineExternalOSC, \defineOSCRelaySynth])
 .addTarget('Full Piece - No Map', [\loadPreviousState, \defineOSCRelaySynth])

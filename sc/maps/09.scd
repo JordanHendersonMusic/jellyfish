@@ -1,5 +1,7 @@
-JHOSCMapStore.append((\min: 120, \max: 120), (\time: 30, \curve: 0), {
+JHOSCMapStore.append((\min: 30, \max: 30), (\time: 30, \curve: 0.5), {
 	|src, isActive|
+
+	var fade_out = Env.linen( 30, 1, 1).kr(0, isActive).linlin(0, 1, 1, 0);
 
 	var activeState = (
 		'bass/amp': 0,
@@ -15,6 +17,7 @@ JHOSCMapStore.append((\min: 120, \max: 120), (\time: 30, \curve: 0), {
 		'bass/amp': 1,
 		'phase': 0,
 	);
+
 	var nodder = JHNodder(src['/webcam/nod/state'][0], src['syncron/state'],
 		activeState, waitState, anxState
 	);
@@ -38,9 +41,9 @@ JHOSCMapStore.append((\min: 120, \max: 120), (\time: 30, \curve: 0), {
 		'/Jellyfish/texture/rotate': 0,
 		'slowWater/snd/overlap': current_smooth,
 
-		'bass/wobble/dry/amp': nodder.get('bass/amp').lag2ud(4, 0.2),
+		'bass/wobble/dry/amp': nodder.get('bass/amp').lag2ud(4, 0.2) * fade_out,
 		'bass/wobble/freq': 1,
-		'bass/wobble/comb/decay': nodder.get('bass/amp').lag2ud(6, 0.2),
+		'bass/wobble/comb/decay': nodder.get('bass/amp').lag2ud(2, 0.2),
 		'bass/wobble/stick/freq': 1,
 		'bass/wobble/bpf': 1 - low_amp
 	)
@@ -49,8 +52,8 @@ JHOSCMapStore.append((\min: 120, \max: 120), (\time: 30, \curve: 0), {
 		'slowWater/ctl/location': LFNoise2.kr(0.2!2).unipolar,
 		'slowWater/snd/pan/pos': 0.25,
 		'slowWater/snd/pan/focus': current_smooth,
-		'slowWater/snd/dry/amp': current_smooth.linlin(0.8, 1, -60, -10).dbamp.lag(0.05),
-		'slowWater/snd/wet/amp': current_smooth.linlin(0, 1, -25, -5).dbamp,
+		'slowWater/snd/dry/amp': current_smooth.linlin(0.8, 1, -60, -10).dbamp.lag(0.05) * fade_out,
+		'slowWater/snd/wet/amp': current_smooth.linlin(0, 1, -25, -5).dbamp * fade_out,
 
 		'waterGrain/output/dry/amp': 0,
 		'waterGrain/output/wet/amp': 0,
@@ -69,7 +72,7 @@ JHOSCMapStore.append((\min: 120, \max: 120), (\time: 30, \curve: 0), {
 	(
 		'/Jellyfish/rotation':[0.5, 0.52, 0.22],
 		'/Jellyfish/thickness': global_amp.linlin(0, 0.4, 0.4, 1),
-		'/Jellyfish/brightness': global_amp * current_smooth * 0.6,
+		'/Jellyfish/brightness': global_amp * current_smooth * 0.6 * fade_out,
 		'/Distort/size': low_amp * current_smooth,
 		'/Distort/displacement': 0.51,
 		'/Distort/blur': 0.4,
@@ -95,29 +98,5 @@ JHOSCMapStore.append((\min: 120, \max: 120), (\time: 30, \curve: 0), {
 		'/Camera/lookAt/lerp': 0.0,
 	)
 })
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
