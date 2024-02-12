@@ -1,46 +1,18 @@
-(
+"Starting to launch jellyfish".postln;
+
 ~hpwd = "/home/jordan/Work/projects/jellyfish"; // home working dir
 ~pwd = ~hpwd +/+ "sc"; // project working directory
 ~camwd = ~hpwd +/+ "webcamtrack_mediapipe";
 ~settings_file_to_load = "control_presets/default.json";
 
-// guitar is stage right
-// jellyfish stage left
-
-~outChans = 4;
+~outChans = 4; // does stereo output any way, just internal.
 
 ///////////////////////////////////
-// * Launch other progams
-
+// * Define OSC ports
 
 ~to_unity =    NetAddr("localhost", 12346);
 ~from_unity =  NetAddr("localhost", 12347);
 ~from_webcam = NetAddr("localhost", 65313);
-
-fork {
-	Server.killAll;
-	0.01.wait;
-
-	~launchOtherPrograms = {
-		~unity_progam = ~unity_progam ?? {unixCmd(~hpwd +/+ "/jellyfish_unity_builds/buildK.x86_64")};
-		~mediapipe = ~mediapipe ?? {unixCmd(~camwd +/+ "/venv/bin/python" + ~camwd +/+ "/main.py")};
-	};
-
-	~killOtherPrograms = {
-		~unity_progam !? { unixCmd("kill " +  ~unity_progam) };
-		~mediapipe !? {unixCmd("killall -9 " + ~mediapipe)};
-		unixCmd("killall -9 python");
-
-		~unity_progam = nil;
-		~mediapipe = nil;
-	};
-
-	ServerBoot.add(~launchOtherPrograms);
-	ShutDown.add(~killOtherPrograms);
-	ServerQuit.add(~killOtherPrograms);
-	CmdPeriod.add(~killOtherPrograms);
-
-};
 
 JHCheckUDPListeningPort(~from_webcam);
 JHCheckUDPListeningPort(~from_unity);
@@ -54,31 +26,44 @@ s.options.numInputBusChannels = 2;
 s.options.numWireBufs = 1024;
 s.options.numOutputBusChannels = 2 + 1 + ~outChans;
 
-//"SC_JACK_DEFAULT_INPUTS".setenv("system:capture_3,system:capture_4");
-//"SC_JACK_DEFAULT_OUTPUTS".setenv("system:playback_1,system:playback_2");
-
 ///////////////////////////////////
 // * subtargets
 
 ~subtargets = JHSubTargets()
+
+.add(\launch_unity, func: {
+	var unity_progam = unixCmd(~hpwd +/+ "/jellyfish_unity_builds/buildK.x86_64");
+	var t = 0.1.wait;
+	var kill_unity = { unixCmd("kill -9" +  unity_progam); };
+	ShutDown.add(kill_unity);
+	ServerQuit.add(kill_unity);
+})
+
+.add(\launch_mediapipe, func: {
+	var mediapipe = unixCmd(~camwd +/+ "/venv/bin/python" + ~camwd +/+ "/main.py");
+	var t = 0.1.wait;
+	var kill_mediapipe = {
+		unixCmd("kill -9" +  mediapipe);
+		unixCmd("killall -9 python");
+	};
+	ShutDown.add(kill_mediapipe);
+	ServerQuit.add(kill_mediapipe);
+})
+
 .add(\jack_connect, func: {
 	[
 		"jack_connect system:capture_3 SuperCollider:in_1",
 		"jack_connect system:capture_4 SuperCollider:in_2",
-		"jack_connect system:capture_3 REAPER:in1",
-		"jack_connect system:capture_4 REAPER:in2",
-		"jack_connect SuperCollider:out_1 REAPER:in3",
-		"jack_connect SuperCollider:out_2 REAPER:in4",
-		"jack_connect SuperCollider:out_3 REAPER:in5",
-		"jack_connect SuperCollider:out_4 REAPER:in6",
-		"jack_connect SuperCollider:out_5 REAPER:in7",
-		"jack_connect SuperCollider:out_6 REAPER:in8",
-		"jack_connect SuperCollider:out_7 REAPER:in9",
 
 		"jack_connect SuperCollider:out_1 system:playback_1",
-		"jack_connect SuperCollider:out_2 system:playback_2"
+		"jack_connect SuperCollider:out_2 system:playback_2",
+
+		// consider sending the mics out seperately?
+		//"jack_connect system:capture_3 system:playback_3",
+		//"jack_connect system:capture_4 system:playback_3",
 	].do(_.unixCmd);
 })
+
 .add(\buildDataSets, func: {
 	~waterDataSet = JHImport(~pwd +/+ "datasets/water.scd").(
 		cachePath: ~pwd +/+ "audio/cache/waterDrops",
@@ -114,13 +99,11 @@ s.options.numOutputBusChannels = 2 + 1 + ~outChans;
 .add(\defineMainEffects, [\defineIO], {
 	~synthGroup.withGroup {
 		~effectGroup = JHGroup(addAction: 'addToTail').withGroup {
-
 			JHImport(~pwd +/+ "groups/effect/reverb.scd").(
 				outChans: ~outChans,
 				ambiFile: ~pwd +/+ "audio/ir/york_minster_ambi.wav"
 			)
 			.connect(_.getOut('out'), ['output/mixer', 'in']);
-
 		}
 	}
 })
@@ -193,32 +176,35 @@ s.options.numOutputBusChannels = 2 + 1 + ~outChans;
 })
 
 .add(\defineMainOSCMap, [\defineMainMap, \defineOSCRelaySynth], {
-	DebugOut.enable = true;
+	DebugOut.enable = false;
 
 	~relayGroup.withGroup {
 		~jhoscmapper = JHOSCMapperSynth.mkSynth()
 	};
 
-	Routine({ loop {
-		2.wait;
-		postf("current position is : %\n", ~jhoscmapper.busMap['map/number'].bus.getSynchronous());
-	}}).play;
-
+	if(DebugOut.enable, {
+		Routine({ loop {
+			2.wait;
+			postf("current position is : %\n", ~jhoscmapper.busMap['map/number'].bus.getSynchronous());
+		}}).play;
+	});
 })
 
-.add(\synthTester, [\defineMainEffects, \defineOSCRelaySynth, \buildDataSets], {
-
-})
 
 .add(\loadPreviousState, [\defineMainSynths], {
 	JHSynthControls.loadFrom(~pwd +/+ ~settings_file_to_load)
+})
+
+.add(\external_launch, [\defineMainOSCMap, \loadPreviousState, \jack_connect, \launch_mediapipe], {
+	~to_unity.sendMsg("/launch_project/finished", 1);
 });
 
 ///////////////////////////////////
 // * target launcher
 
-JHLauncher(~subtargets)
-.addTarget('Full Piece', [\defineMainOSCMap, \loadPreviousState, \jack_connect])
+~launcher = JHLauncher(~subtargets)
+.addTarget('Full Piece', [\defineMainOSCMap, \loadPreviousState, \jack_connect, \launch_mediapipe, \launch_unity])
+.addTarget('External Launch', [\external_launch])
 //.addTarget('Full Piece - No Load', [\defineMainOSCMap])
 .addTarget('Only External OSC', [\defineExternalOSC, \defineOSCRelaySynth])
 .addTarget('Full Piece - No Map', [\loadPreviousState, \defineOSCRelaySynth])
@@ -226,12 +212,30 @@ JHLauncher(~subtargets)
 //.addTarget('Build Data Sets', [\buildDataSets])
 .addTarget('Prep For Scratch', [\defineMainSynths])
 .addTarget('Data Set Tester', [\buildDataSets])
+//.mkGUI()
+;
 
 
-//.launchTarget('Full Piece')
-.mkGUI()
+OSCFunc.newMatching({ |...msg|
+	~to_unity.sendMsg("/launch_project/launching", 1);
+	~launcher.launchTarget('External Launch');
+}, "/launch_project");
 
-)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

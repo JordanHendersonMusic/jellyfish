@@ -6,7 +6,6 @@ from head_tracker_relay import HeadTrackerRelay
 from landmark_processor import process_landmarks
 from video_processor import HideVideo, ShowVideo
 
-object
 def main(show_video: bool, port: int = 65313):
     process_landmarks(
         landmark_processor=HeadTrackerRelay(

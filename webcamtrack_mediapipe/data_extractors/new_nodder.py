@@ -72,7 +72,7 @@ class NewNodder:
             self.reset_integrals()
 
     def looking_for_nod(self, delta: float, t: float):
-        if self.i < 2 and 0.25 < t and self.ii > 10:
+        if self.i < 2 and 0.25 < t and self.ii > 10: # i and ii and the same - 
             self.advance()
         elif t < 5:  # max dur of nod
             pass
